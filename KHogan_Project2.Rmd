@@ -9,14 +9,18 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, fig.align = "center", fig.width = 6, fig.height = 3.5, options(digits = 2))
-```
-
-```{r libraries, message = FALSE, error = FALSE,  warning = FALSE, include = FALSE}
 
 # Note to Reviewers/Graders:  Sorry this dataset is huge and the models take a long time to run.  
 # To be less time-consuming, I have included code in the .R & .Rmd files to save model results from .R & re-load in .Rmd. 
 # Or to save even more time, I have included the larger glm & randomForest models in my github repo as CYO_Models.RData. 
-# You can download it & load it into your global environment instead. This will save over an hour of processing time.
+
+# You can download it at https://github.com/KHHogan06/CYO-Project/releases/download/v1-files/CYO_Models.RData 
+#   & load it into your global environment. This will save over an hour of processing time. Code provided before Modeling section.
+
+
+```
+
+```{r libraries, message = FALSE, error = FALSE,  warning = FALSE, include = FALSE}
 
 # Require & Load Libraries
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
@@ -58,18 +62,30 @@ memory.limit(size=48000)
 
 ## Introduction
 
-Credit card fraud losses total billions of dollars each year and is a major problem for financial institutions, customers and merchants. The 2018 Nilson Report estimated over $9 billion in fraudulent credit card transactions in the United State alone.  Banks process thousands of transactions every minute and possess huge data sets, making good fraud detection models both necessary and possible. The largest problem for fraud detection models are imbalanced datasets. Credit card datasets are very large with few fraudulent transactions.  Since credit card companies cannot release real client data due to confidentiality, I chose a synthetic dataset from Kaggle to explore the issue.  While synthetic data will not show real-world trends or unearth new predictors, it still provides excellent practice for analysis and machine learning modeling to detect anomalies and trends. I will compare several algorithms presented in [HarvardX's Machine Learning course](https://rafalab.github.io/dsbook/examples-of-algorithms.html). Instead of overall accuracy, the focus of this project will be the process of choosing predictors, comparing and tuning algorithms for predicting the minority class and cost-saving results.  
+Credit card fraud losses total billions of dollars each year and is a major problem for financial institutions, customers and merchants. The 2018 Nilson Report estimated over $9 billion in fraudulent credit card transactions in the United State alone.  Banks process thousands of transactions every minute and possess huge data sets, making good fraud detection models both necessary and possible. Since credit card companies cannot release real client data due to confidentiality, I chose a synthetic dataset from Kaggle to explore the issue.  While synthetic data will not show real-world trends or unearth new predictors, it still provides excellent practice for analysis and machine learning modeling to detect anomalies and trends.
 
-This dataset was generated using a Sparkov Data Generation Tool containing 23 real-life variables. The data contains two years of data for 1000 cardholders. The set can be found at [kaggle.com/kartik2112/fraud-detection](https://www.kaggle.com/kartik2112/fraud-detection).  The data has already been split into training and test sets. The training set is huge with over 1.2 million rows.  
+The dataset was generated using a Sparkov Data Generation Tool containing 23 real-life variables. It contains two years of data for 1000 cardholders. The set can be found at [kaggle.com/kartik2112/fraud-detection](https://www.kaggle.com/kartik2112/fraud-detection).  The data has already been split into training and test sets. The training set is huge with over 1.2 million rows.  
+
+The largest problem for fraud detection models are imbalanced datasets. Credit card datasets are very large with few fraudulent transactions. I will explore the data to look for trends to detect fraud. Once relevant features are chosen, I will compare several algorithms presented in [HarvardX's Machine Learning course](https://rafalab.github.io/dsbook/examples-of-algorithms.html). Instead of overall accuracy, the focus of this project will be the process of choosing predictors, comparing and tuning algorithms for predicting the minority class and cost-saving results.  
   
   
 
 ```{r importing data, message = FALSE, error = FALSE,  warning = FALSE}
 
-# Data sets uploaded with project submission. 
-# Please save both files into a temp dir then extract with following code: 
-fraudTest <- read_csv("temp/fraudTest.csv")
-fraudTrain <- read_csv("temp/fraudTrain.csv")
+# Data sets uploaded to github as specified in project instructions. 
+# Create temp file and download zip file containing dataset
+dl <- tempfile()
+download.file("https://github.com/KHHogan06/CYO-Project/releases/download/v1-files/fraud_data.zip", dl)
+
+# unzip
+unzip(dl)
+
+# read & import csv files
+fraudTest <- read_csv(unzip(dl,"fraudTest.csv"))
+fraudTrain <- read_csv(unzip(dl,"fraudTrain.csv"))
+
+# remove tempfile
+rm(dl)
 
 ```
 
@@ -111,7 +127,7 @@ The date range is 2019-01-01 to 2020-06-21 not the expected two years.  The Kagg
 Training set: `r  range(fraudTrain$trans_date_trans_time)`.  Test set: `r  range(fraudTest$trans_date_trans_time)`.  
   
   
-This seems like poor sampling method especially for time trends.  I will recombine data and repartition the training and test splits based on random sampling method.
+This seems like poor sampling method especially for time trends.  I will recombine data then repartition into 80/20 training and test splits based on random sampling method.
 
 
 ```{r Recreating training & test sets, message = FALSE, error = FALSE, warning = FALSE}
@@ -535,7 +551,8 @@ State would not be a good predictor. I believe I can get an effective model with
 Before building the models, the dataset needs to be prepped to include the relevant predictors.  To reduce the size of the dataset, I will remove unused columns, then convert the data and time elements into features. I will keep the predictors to amount, category and transaction time and date parts with merchant, cc_num as possibilities. Since fraud is usually repeated, I believe it has usable predicting power. Although a recency or frequency feature once fraud is detected might provide a better predictor, for simplicity I will keep cc_num.  Date parts will be included as factors.
 
 The synthetic card numbers create additional problems for modeling. In reality card numbers are between 13 to 16 digits. The first digit represents the card type and digits two through six identify the institution, the final digits are unique account ids. Here the cc_nums here are between 11 and 19 digits not following this pattern.  I will change cc_num to character variable to be handled appropriately by the algorithms.  Although using unique identifiers such as account numbers can lead to over training, fraud is usually repeated and a fraud detection model would be deployed for use within a bank. I believe it has usable predicting power and will fits models with and without for comparison.  
-  
+
+To train and tune models, it is necessary to resplit the training set to avoid over-training.  I will use a 90/10 train/test split to use as much of the data as possible since there are so few fraudulent transactions.
   
   
 
@@ -612,7 +629,28 @@ Costs:
   * Fraud Missed: Amount of fraud missed ($ FP)
   * MisClassified: Amount incorrectly predicted as fraud ($ FN)
 
- 
+  
+```{r loading large models, eval = FALSE, message = FALSE, error = FALSE, warning = FALSE}
+
+# Run this code chunk, if you prefer to save time & load already fit models.
+#  this file contains the glm & randomForests models which take over an hour to process.
+
+# create temp file & url 
+dl <- tempfile()
+URL <- "https://github.com/KHHogan06/CYO-Project/releases/download/v1-files/CYO_Models.RData"
+
+# download url into temp file
+download.file(URL, dl)
+
+# load .RData into environment. This takes a few minutes.
+load(dl)
+
+# remove files
+rm(dl, URL)
+```
+   
+   
+   
 ## Model Building  
 
 To begin I calculate lost revenue when no fraud is detected.   I will evaluate three versions of each algorithm with different variables and parameters, then choose then best performing construct of each for final evaluation.  
@@ -1076,6 +1114,9 @@ rm(fit_rpart_all, fit_rpart, fit_rpartcp, pfit_rpartcp, fit_rpart_cc, fit_rpartc
 ```
   
   
+  
+  
+  
 ### GLM Models  
 I am comparing two models to emphasize the limitations of glm models in machine learning. Since glm cannot handle high levels of categorical variables, merchant and cc numbers cannot be used. With glm models, first we create the fit model, next calculate probability estimates with: _predict.glm(fit_glm, test2, type = "response")_ and finally create a vector of predicted outcomes based on a threshold.
 
@@ -1087,8 +1128,10 @@ I am comparing two models to emphasize the limitations of glm models in machine 
 # glm model 1: category/amt interaction, date parts as factors. 
 # fit_glm1 <- train2 %>% glm(is_fraud ~ category * amt + trans_hour + day + month + weekday, data=., family = "binomial")
 
-# Load fit_glm1 saved from .R file. Or load CYO_Models.RData into environment.
+# Load fit_glm1 saved from .R file. 
+## Can skip line below if loaded models from github.
 fit_glm1 <- readRDS(file = "fit_glm1.rds")
+
 
 # glm1 estimates
 phat_glm1 <- predict.glm(fit_glm1, test2, type = "response")
@@ -1104,8 +1147,10 @@ yhat_glm1 <- ifelse(phat_glm1 > .5, 1, 0) %>% factor()
 # glm model 2: with bins, no interactions date parts as factors. 
 # fit_glm2 <- train2 %>% glm(is_fraud ~ category + amt + bins + trans_hour + day + month + weekday, data=., family = "binomial")
 
-# Load fit_glm2 saved from .R file. Or load CYO_Models.RData into environment.
+# Load fit_glm2 saved from .R file. 
+## Can skip line below if loaded models from github.
 fit_glm2 <- readRDS(file = "fit_glm2.rds")
+
 
 # glm2 estimates
 phat_glm2 <- predict.glm(fit_glm2, test2, type = "response")
@@ -1189,8 +1234,10 @@ Model 1, even with interaction between category and amount, did not perform very
 # glm model 3: with category/amt/bins interaction & date parts as factors. 
 # fit_glm_bins <- train2 %>% glm(is_fraud ~ category * amt * bins + trans_hour + day + month + weekday, data=., family = "binomial")
 
-# Load fit_glm_bins saved from .R file. Or load CYO_Models.RData into environment.
+# Load fit_glm_bins saved from .R file. 
+## Can skip line below if loaded models from github..
 fit_glm_bins <- readRDS(file = "fit_glm_bins.rds")
+
 
 # glm3 estimates
 phat_glm_bins <- predict.glm(fit_glm_bins, test2, type = "response")
@@ -1319,11 +1366,14 @@ set.seed(1, sample.kind="Rounding")
 # Random Forest Model 1 51 trees    
 # fit_rf51 <- train2 %>% randomForest(is_fraud ~., data = ., ntree = 51, replacement = TRUE, importance = TRUE)
 
-# Load fit_rf51 from .R file. Or load CYO_Models.RData into environment.
+# Load fit_rf51 from .R file. 
+## Can skip line below if loaded models from github.
 fit_rf51 <- readRDS(file = "fit_rf51.rds")
 
-# Making predictions
+
+# Making rf 51 trees predictions
 yhat_rf51 <- predict(fit_rf51, test2, type = "class")
+
 ```
   
   
@@ -1400,10 +1450,11 @@ At Mtry = 3 the minimum OOBError = `r Mtry3_OOBErr` % and Fraud Class Error = `r
 
 ```{r rf51 tuning mtry, include = FALSE, message = FALSE, error = FALSE, warning = FALSE}
 
-# Tuning RF Model for best mtry value 4-6. Using 75 trees. This takes a REALLY long time!!! 
+# Tuning RF Model for best mtry value 4-6. Using 75 trees. This takes a long time! 
 # rf_tune <- tuneRF(train2[-6], train2$is_fraud, mtryStart = 5, ntreeTry = 75, stepFactor = .9)  
 
-# Load rf_tune saved from .R file. Or load CYO_Models.RData into environment.
+# Load rf_tune saved from .R file. 
+## Can skip line below if loaded models from github.
 rf_tune <- readRDS(file = "rf_tune.rds")
 
 ```
@@ -1439,10 +1490,12 @@ _Formula: randomForest(is_fraud ~ ., data = train2, ntree = 251, mtry = 4, repla
 # Random Forest Model 2: 251 trees, 4/10 predictors. 
 # fit_rf251 <- train2 %>% randomForest(is_fraud ~., data = ., ntree = 251, mtry = 4, replacement = TRUE, importance = TRUE)
 
-# Load fit_rf251 saved from .R file. Or load CYO_Models.RData into environment.
+# Load fit_rf251 saved from .R file.
+## Can skip line below if loaded models from github.
 fit_rf251 <- readRDS(file = "fit_rf251.rds")
 
-# predictions
+
+# rf 251 trees predictions
 yhat_rf251 <- predict(fit_rf251, test2, type = "class")
 
 ```

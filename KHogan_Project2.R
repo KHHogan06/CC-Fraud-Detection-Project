@@ -3,8 +3,10 @@
 
 # Note to Reviewers/Graders:  Sorry this dataset is large, and the models take a long time to run.  
 # To be less time-consuming, I have included code in the .R & .Rmd files to save model results from .R & re-load in .Rmd.
+
 # Or to save even more time, I have included the larger glm & randomForest models in my github repo as CYO_Models.RData. 
-# You can download it & load it into your global environment instead. This will save over an hour of processing time.
+# You can download it at https://github.com/KHHogan06/CYO-Project/releases/download/v1-files/CYO_Models.RData 
+#   & load it into your global environment. This will save over an hour of processing time.  Code provided before Modeling section.
 
 
 # Require & Load Libraries
@@ -48,13 +50,22 @@ memory.limit(size=48000)
 #################################################################
 ###         Importing Credit Card Fraud data sets             ###
 
-# Credit card fraud dataset obtained from Kaggle at: https://www.kaggle.com/kartik2112/fraud-detection
+# Credit card fraud dataset obtained from Kaggle at: 
+# https://www.kaggle.com/kartik2112/fraud-detection
 
+# Create temp file and download zip file containing dataset
+dl <- tempfile()
+download.file("https://github.com/KHHogan06/CYO-Project/releases/download/v1-files/fraud_data.zip", dl)
 
-# Data sets uploaded with project submission. Please save both files into a temp dir then extract with following code: 
-fraudTest <- read_csv("temp/fraudTest.csv")
-fraudTrain <- read_csv("temp/fraudTrain.csv")
+# unzip
+unzip(dl)
 
+# read & import csv files
+fraudTest <- read_csv(unzip(dl,"fraudTest.csv"))
+fraudTrain <- read_csv(unzip(dl,"fraudTrain.csv"))
+
+# remove tempfile
+rm(dl)
 
 
 #################################################################
@@ -405,7 +416,7 @@ train_prep <- train_set %>%  mutate(month = month(trans_date_trans_time, label =
                           mutate(day = as_factor(day), trans_hour = as_factor(trans_hour))
 
  
-# Splitting data again: for modeling training & testing. Leaving test_set for final model evaluation.
+# Splitting data again at 90/10: for modeling training & testing. Leaving test_set for final evaluation of models.
 set.seed(1, sample.kind="Rounding") 
 model_index <- createDataPartition(y = train_prep$is_fraud, times = 1, p = 0.1, list = FALSE)
 train2 <- train_prep[-model_index,]
@@ -449,6 +460,26 @@ saveRDS(test_set, file = "test_set.rds")
 
 
 
+
+
+##############################################
+##          Loading Generated Models        ##
+
+# If you want to run the code, but not spend the time processing the models:
+# This will download fit models and load them into your RStudio environment.
+
+# create temp file & url 
+dl <- tempfile()
+URL <- "https://github.com/KHHogan06/CYO-Project/releases/download/v1-files/CYO_Models.RData"
+
+# download url into temp file
+download.file(URL, dl)
+
+# load .RData into environment. This may take a few minutes.
+load(dl)
+
+# remove files
+rm(dl, URL)
 
 
 
@@ -742,8 +773,9 @@ rm(fit_rpart_all, fit_rpart, fit_rpartcp, pfit_rpartcp, fit_rpart_cc, fit_rpartc
 ## GLM model 1 ##
 
 # category & amt interaction, no bins, date parts as factors. (This took about 5 minutes.)
-# Or can load from github CYO_Models.RData 
+## Can skip line below if loaded models from github 
 fit_glm1 <- train2 %>% glm(is_fraud ~ category * amt + trans_hour + day + month + weekday, data=., family = "binomial")
+
 
 # glm predictions
 phat_glm1 <- predict.glm(fit_glm1, test2, type = "response")
@@ -755,8 +787,9 @@ varImp(fit_glm1)
 ## GLM model 2 ##
 
 # category & amt interaction, no bins, date parts as factors.(~ 5 mins)
-# Or can load from github CYO_Models.RData 
+## Can skip line below if loaded models from github 
 fit_glm2 <- train2 %>% glm(is_fraud ~ category + amt + bins + trans_hour + day + month + weekday, data=., family = "binomial")
+
 
 # glm predictions
 phat_glm2 <- predict.glm(fit_glm2, test2, type = "response")
@@ -830,10 +863,10 @@ rm(glm1_NPV, glm1_Sp, glm1_saved, glm1_miscl, glm1_miss,
 ## GLM model 3 ##
 
 # Model with Category/amt/bins interaction, all date parts. Takes about 25 mins.
-# Or can load from github CYO_Models.RData 
-
+## Can skip line below if loaded models from github 
 fit_glm_bins <- train2 %>% glm(is_fraud ~ category * amt * bins + trans_hour + day + month + weekday, data=., family = "binomial",
                                model = FALSE, y = FALSE)
+
 
 # glm3 estimates
 phat_glm_bins <- predict.glm(fit_glm_bins, test2, type = "response")
@@ -951,13 +984,13 @@ rm(fit_glm, fit_glm_bins, yhat_glm_bins.45, phat_glm_bins)
 set.seed(1, sample.kind="Rounding")
 
 # 51 trees, default predictors  (Don't have enough memory for default 500 tress.) Takes about 5 mins.
-# Or can load from github CYO_Models.RData 
-
+## Can skip line below if loaded models from github 
 fit_rf51 <- train2 %>% 
   randomForest(is_fraud ~., data = .,
                ntree = 51, 
                replacement = TRUE,
                importance = TRUE)
+
 
 # Making predictions
 yhat_rf51 <- predict(fit_rf51, test2, type = "class")
@@ -1002,9 +1035,8 @@ saveRDS(fit_rf51, file = "fit_rf51.rds")
 
 ## Tuning RF Model for best mtry value ##
 
-# Tuning rf for mtry 4:6, 75 trees.  Takes about 18 mins. 
-# (Can skip this step. rf_tune not used except as evaluation. See report.)
-# Or can load from github CYO_Models.RData 
+# Tuning rf for mtry 4:6, 75 trees.  Takes about 18 mins.  
+## Can skip line below if loaded models from github 
 rf_tune <-  tuneRF(train2[-6], train2$is_fraud, mtryStart = 5, ntreeTry = 75, stepFactor = .9,
                    trace=TRUE, plot=TRUE)
 
@@ -1022,7 +1054,8 @@ saveRDS(rf_tune, file = "rf_tune.rds")
 ## Random Forest Model 2 ##
 
 # 251 trees, 4/10 predictors. This takes about 25 mins & a lot of memory.
-# Or can load from github CYO_Models.RData 
+## Can skip line below if loaded models from github.
+## Note: RandomForest results will differ slightly if you run your own model.
 fit_rf251 <- train2 %>% 
                randomForest(is_fraud ~., data = .,
                   ntree = 251, mtry = 4,
@@ -1058,6 +1091,7 @@ saveRDS(fit_rf251, file = "fit_rf251.rds")
 
 
 confusionMatrix(yhat_rf251, test_set$is_fraud)$table
+
 
 #########################################
 ###   Final Validation: RF Model  2   ###
