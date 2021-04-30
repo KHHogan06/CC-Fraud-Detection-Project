@@ -533,6 +533,7 @@ yhat_rpart_all <- predict(fit_rpart_all, test2, type = "class")
 plot(fit_rpart_all, margin = 0.1)
 text(fit_rpart_all, cex = 0.5, pretty=1)
 
+
 # Evaluating model performance
 confusionMatrix(yhat_rpart_all, test2$is_fraud)$table
 rp_all_Sp <- confusionMatrix(yhat_rpart_all, test2$is_fraud)$byClass["Specificity"]
@@ -571,8 +572,9 @@ fit_rpart <- train2 %>% select(-c(trans_date_trans_time, cc_num, merchant, bins)
 yhat_rpart <- predict(fit_rpart, test2, type = "class")
 
 # plot decision tree rules. Almost readable.
-plot(fit_rpart2, margin = 0.1)
-text(fit_rpart2, cex = 0.5, pretty=1)
+plot(fit_rpart, margin = 0.25)
+text(fit_rpart, cex = 0.5, pretty=1)
+
 
 # Evaluating model 2 Performance
 confusionMatrix(yhat_rpart, test2$is_fraud)$table
